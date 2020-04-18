@@ -1,0 +1,12 @@
+---
+btrshot_no_snapshot: []
+btrshot_snapshot_frequency:
+  hourly: hourly
+  daily: daily
+  weekly: weekly
+  monthly: monthly
+btrshot_snapshot_keep:
+  hourly: 24
+  daily: 7
+  weekly: 4
+  monthly: 3

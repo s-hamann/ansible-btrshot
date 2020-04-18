@@ -1,0 +1,36 @@
+---
+- name: 'install btrshot.sh dependencies'
+  package:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - bash
+    - findutils
+    - sed
+
+- name: 'install btrshot.sh'
+  copy:
+    src: 'btrshot.sh'
+    dest: '/usr/local/sbin/'
+    owner: root
+    group: root
+    mode: 0755
+
+- name: 'use configured list of subvolumes to snapshot'
+  set_fact:
+    _snapshot_subvolumes: "{{ btrshot_snapshot }}"
+  when: "btrshot_snapshot is defined"
+
+- name: 'autodetect list of subvolumes to snapshot'
+  set_fact:
+    _snapshot_subvolumes: "{{ _snapshot_subvolumes | default({}) | combine( { device: ansible_facts['mounts'] | selectattr('device', '==', device) | map(attribute='options') | map('regex_search', '(?<=subvol=)[^,]*') | reject('search', 'snapshots') | list } ) }}"
+  loop: "{{ ansible_facts['mounts'] | selectattr('fstype', '==', 'btrfs') | map(attribute='device') | unique | list }}"
+  loop_control:
+    loop_var: device
+  when: "btrshot_snapshot is not defined"
+
+- name: 'configure automatic snapshots'
+  include_tasks: btrshot.yml
+  loop: "{{ btrshot_snapshot_frequency.keys() | list }}"
+  loop_control:
+    loop_var: tag
