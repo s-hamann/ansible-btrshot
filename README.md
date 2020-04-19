@@ -22,12 +22,12 @@ Role Variables
 * `btrshot_snapshot_frequency`  
   When to do periodic btrfs snapshots.
   This variable is a dictionary with keys that are used to group snapshots.
+  Note that for the purpose of grouping snapshots the key is used only up to the first `%` while for the purpose of identifying cron jobs the full key is used.
   The values can be a time specification as understood by cron or the special keywords `hourly`, `daily`, `weekly` or `monthly`.
   The default consists of the aforementioned special keywords as keys *and* values.
-  Note that is is not possible to have two keys with the same special keyword value.
 * `btrshot_snapshot_keep`  
   How many old snapshots to keep when creating a new snapshot.
-  This variable is a dictionary with the same keys as `btrshot_snapshot_frequency`.
+  This variable is a dictionary with the same keys (up to the first `%`) as `btrshot_snapshot_frequency`.
   The values are integers that specify the total number of snapshots to keep for the respective interval.
   Defaults to keeping 24 hourlies, 7 dailies, 4 weeklies and 3 monthlies.
 
@@ -52,6 +52,7 @@ btrshot_snapshot:
 btrshot_snapshot_frequency:
     hourly: '0 * * * *'
     daily: '0 0 * * *'
+    daily%sunday_special: '0 1 * * sun'
     weekly: weekly
 ```
 

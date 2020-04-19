@@ -1,7 +1,7 @@
 ---
 - name: "set btrshot command for {{ tag }} snapshots"
   set_fact:
-    _btrshot_cmd: "{% for device, subvolumes in _snapshot_subvolumes | dictsort %}[ -e {{ device | quote }} ] && for subvol in {{ subvolumes | reject('in', btrshot_no_snapshot[device] | default([])) | map('quote') | join(' ') }}; do btrshot.sh --read-only --quiet --device {{ device | quote }} -- \"${subvol}\" snapshots {{ tag | quote }} {{ btrshot_snapshot_keep[tag] | mandatory | quote }}; done; {% endfor %}"
+    _btrshot_cmd: "{% for device, subvolumes in _snapshot_subvolumes | dictsort %}[ -e {{ device | quote }} ] && for subvol in {{ subvolumes | reject('in', btrshot_no_snapshot[device] | default([])) | map('quote') | join(' ') }}; do btrshot.sh --read-only --quiet --device {{ device | quote }} -- \"${subvol}\" snapshots {{ tag | regex_replace('%.*', '') | quote }} {{ btrshot_snapshot_keep[tag] | mandatory | regex_replace('%.*', '') | quote }}; done; {% endfor %}"
 
 - name: 'create cronjob directory'
   file:
@@ -11,7 +11,7 @@
 
 - name: 'create cronjob'
   copy:
-    dest: "/etc/cron.{{ btrshot_snapshot_frequency[tag] }}/btrshot"
+    dest: "/etc/cron.{{ btrshot_snapshot_frequency[tag] }}/btrshot_{{ tag | replace('/', '_') }}"
     content: "#!/bin/sh\n# {{ tag }} btrfs snapshots\nPATH=\"$PATH:/usr/local/sbin\"\n{{ _btrshot_cmd }}\n"
     owner: root
     group: root
