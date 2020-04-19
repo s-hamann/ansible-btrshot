@@ -19,6 +19,10 @@ Role Variables
   Subvolumes not to set up automatic snapshots for.
   Structured as a dictionary where keys are devices and values are lists of subvolumes on the respective devices.
   Optional.
+* `btrshot_snapshot_target`  
+  The name of the target subvolume that stores snapshots.
+  This can be an absolute path that identifies the subvolume on the root volume of the respective device or a relative path that is interpreted as relative to the subvolume(s) of which a snapshot is taken.
+  Defaults to `/snapshots`.
 * `btrshot_snapshot_frequency`  
   When to do periodic btrfs snapshots.
   This variable is a dictionary with keys that are used to group snapshots.

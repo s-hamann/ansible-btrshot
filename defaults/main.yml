@@ -1,4 +1,5 @@
 ---
+btrshot_snapshot_target: '/snapshots'
 btrshot_no_snapshot: []
 btrshot_snapshot_frequency:
   hourly: hourly

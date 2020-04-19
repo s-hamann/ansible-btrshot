@@ -1,7 +1,7 @@
 ---
 - name: "set btrshot command for {{ tag }} snapshots"
   set_fact:
-    _btrshot_cmd: "{% for device, subvolumes in _snapshot_subvolumes | dictsort %}[ -e {{ device | quote }} ] && for subvol in {{ subvolumes | reject('in', btrshot_no_snapshot[device] | default([])) | map('quote') | join(' ') }}; do btrshot.sh --read-only --quiet --device {{ device | quote }} -- \"${subvol}\" snapshots {{ tag | regex_replace('%.*', '') | quote }} {{ btrshot_snapshot_keep[tag] | mandatory | regex_replace('%.*', '') | quote }}; done; {% endfor %}"
+    _btrshot_cmd: "{% for device, subvolumes in _snapshot_subvolumes | dictsort %}[ -e {{ device | quote }} ] && for subvol in {{ subvolumes | reject('in', btrshot_no_snapshot[device] | default([])) | map('quote') | join(' ') }}; do btrshot.sh --read-only --quiet --device {{ device | quote }} -- \"${subvol}\" {{ btrshot_snapshot_target | quote }} {{ tag | regex_replace('%.*', '') | quote }} {{ btrshot_snapshot_keep[tag | regex_replace('%.*', '')] | mandatory | quote }}; done; {% endfor %}"
 
 - name: 'create cronjob directory'
   file:

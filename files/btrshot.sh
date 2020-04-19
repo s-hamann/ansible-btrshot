@@ -1,5 +1,5 @@
 #!/bin/bash
-# btrshot v0.1.1
+# btrshot v0.2
 
 
 # loglevel constants
@@ -15,6 +15,8 @@ cat - <<EOH
 $(basename -- "$0") [<options>] [--] <source subvol> <snapshots subvol> <tag> [<keep>]
   <source subvol> is the mount point of the subvolume to take a snapshot of.
   <snapshots subvol> is the mount point of the subvolume to store the snapshot.
+    It may be an absolute path or a relative path, which is interpreted
+    relative to the source subvolume's mount point.
     If either subvolume is not mounted, it will be mounted according to
     /etc/fstab for the snapshot (and unmounted afterwards).
   The snapshot will be put in a directory named <tag> on the snapshots
@@ -31,6 +33,8 @@ The following options are valid:
       Device that contains the source and snapshot subvolumes. If this is
       given, <source subvol> and <snapshots subvol> are interpreted as
       subvolume names on that device instead of mount points.
+      Again, if <snapshots subvol> is a relative path specification, it is
+      interpreted relative to <source subvol>, not to the device's root volume.
       The device will be mounted to a temporary mount point.
   -r, --read-only
       Make a read-only snapshot.
@@ -247,9 +251,19 @@ if [[ $# -lt 3 || $# -gt 4 ]]; then
     exit 1
 fi
 
+if [[ "${2:0:1}" == '/' ]]; then
+    snapshot_is_relative=false
+else
+    snapshot_is_relative=true
+fi
 if [[ -z "${device}" ]]; then
     source_subvol_path="$1"
-    snapshot_subvol_path="$2"
+    if ${snapshot_is_relative}; then
+        snapshot_subvol_path="${source_subvol_path}/$2"
+        snapshot_subvol_name="$2"
+    else
+        snapshot_subvol_path="$2"
+    fi
 else
     source_subvol_name="$1"
     snapshot_subvol_name="$2"
@@ -277,25 +291,23 @@ if [[ -n "${device}" ]]; then
     mkdir -- "${tmpdir}/btrfs" || die 16 "Could not create temporary mount point '${tmpdir}/btrfs'."
     mount -t btrfs -o noatime "${device}" "${tmpdir}/btrfs" || die 17 "Could not mount ${device} as btrfs."
     source_subvol_path="${tmpdir}/btrfs/${source_subvol_name}"
-    snapshot_subvol_path="${tmpdir}/btrfs/${snapshot_subvol_name}"
+    if ${snapshot_is_relative}; then
+        snapshot_subvol_path="${source_subvol_path}/${snapshot_subvol_name}"
+    else
+        snapshot_subvol_path="${tmpdir}/btrfs/${snapshot_subvol_name#/}"
+    fi
 else
     # Make sure the subvolumes are mounted.
     mount_source=true
     mount_snapshots=true
-    while read -r -a line; do
-        # Convert octal escape sequences in the path.
-        mountpoint="$(printf '%b' "${line[1]}")"
-        # Check if the current line references the source subvolume.
-        if [[ "${mountpoint}" == "${source_subvol_path}" ]]; then
-            echo_msg $DEBUG "${source_subvol_path} is currently mounted."
-            mount_source=false
-        fi
-        # Check if the current line references the snapshots subvolume.
-        if [[ "${mountpoint}" == "${snapshot_subvol_path}" ]]; then
-            echo_msg $DEBUG "${snapshot_subvol_path} is currently mounted."
-            mount_snapshots=false
-        fi
-    done < /proc/self/mounts
+    if btrfs subvolume show "${source_subvol_path}" &>/dev/null; then
+        echo_msg $DEBUG "${source_subvol_path} is a subvolume."
+        mount_source=false
+    fi
+    if btrfs subvolume show "${snapshot_subvol_path}" &>/dev/null; then
+        echo_msg $DEBUG "${snapshot_subvol_path} is a subvolume."
+        mount_snapshots=false
+    fi
     # Mount the subvolumes according to /etc/fstab if they are not already mounted.
     if ${mount_source}; then
         echo_msg $DEBUG "Mounting ${source_subvol_path}."
@@ -307,16 +319,8 @@ else
     fi
     # Get the name of the source and snapshot subvolumes.
     echo_msg $DEBUG "Getting the names of the subvolumes."
-    while read -r -a line; do
-        # Convert octal escape sequences in the path.
-        mountpoint="$(printf '%b' "${line[4]}")"
-        if [[ "${mountpoint}" == "${source_subvol_path}" ]]; then
-            source_subvol_name="$(basename -- "$(printf '%b' "${line[3]}")")"
-        fi
-        if [[ "${mountpoint}" == "${snapshot_subvol_path}" ]]; then
-            snapshot_subvol_name="$(basename -- "$(printf '%b' "${line[3]}")")"
-        fi
-    done < /proc/self/mountinfo
+    source_subvol_name="$(btrfs subvolume show "${source_subvol_path}" | sed -n -e 's/\s\+Name:\s\+//p')"
+    snapshot_subvol_name="$(btrfs subvolume show "${snapshot_subvol_path}" | sed -n -e 's/\s\+Name:\s\+//p')"
     if [[ -z "${source_subvol_name}" ]]; then
         echo_msg $WARN "Could not get name of the subvolume at '${source_subvol_path}'. Assuming 'root'."
         source_subvol_name='root'
@@ -332,8 +336,14 @@ fi
 #
 
 timestamp="$(date "+${time_format}")"
-snapshot_name="${snapshot_subvol_name}/${tag}/${source_subvol_name#/}_${timestamp}"
-snapshot_path="${snapshot_subvol_path}/${tag}/${source_subvol_name#/}_${timestamp}"
+if ${snapshot_is_relative}; then
+    # Do not include the source subvolume name in the snapshot name if snapshots are in a subvolume of the source volume.
+    snapshot_name="${snapshot_subvol_name}/${tag}/${timestamp}"
+    snapshot_path="${snapshot_subvol_path}/${tag}/${timestamp}"
+else
+    snapshot_name="${snapshot_subvol_name}/${tag}/${source_subvol_name#/}_${timestamp}"
+    snapshot_path="${snapshot_subvol_path}/${tag}/${source_subvol_name#/}_${timestamp}"
+fi
 
 #
 # Make a snapshot.
@@ -396,8 +406,13 @@ fi
 if [[ "${keep}" -gt 0 ]]; then
     echo_msg $DEBUG "Deleting old snapshots, keeping up to ${keep}."
     # Get the snapshots in the tag directory, sort them by their last modification time and remove all but the latest $keep.
-    # FIXME: the following will delete snapshots of other subvolumes if this subvolume's name is a prefix of their name...
-    find "${snapshot_subvol_path}/${tag}" -mindepth 1 -maxdepth 1 -type d -name "${source_subvol_name#/}_*" -printf '%T@:%p\n' | sort -n | cut -d: -f2- | head -n "-${keep}" | while read -r path; do
+    if ${snapshot_is_relative}; then
+        snapshot_pattern='*'
+    else
+        # FIXME: the following will delete snapshots of other subvolumes if this subvolume's name is a prefix of their name...
+        snapshot_pattern="${source_subvol_name#/}_*"
+    fi
+    find "${snapshot_subvol_path}/${tag}" -mindepth 1 -maxdepth 1 -type d -name "${snapshot_pattern}" -printf '%T@:%p\n' | sort -n | cut -d: -f2- | head -n "-${keep}" | while read -r path; do
         echo_msg $DEBUG "Deleting snapshot '${path}'."
         output="$(btrfs subvolume delete "${path}")"
         if [[ $? -ne 0 ]]; then

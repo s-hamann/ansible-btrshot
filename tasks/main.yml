@@ -23,7 +23,7 @@
 
 - name: 'autodetect list of subvolumes to snapshot'
   set_fact:
-    _snapshot_subvolumes: "{{ _snapshot_subvolumes | default({}) | combine( { device: ansible_facts['mounts'] | selectattr('device', '==', device) | map(attribute='options') | map('regex_search', '(?<=subvol=)[^,]*') | reject('search', 'snapshots') | list } ) }}"
+    _snapshot_subvolumes: "{{ _snapshot_subvolumes | default({}) | combine( { device: ansible_facts['mounts'] | selectattr('device', '==', device) | map(attribute='options') | map('regex_search', '(?<=subvol=)[^,]*') | reject('==', btrshot_snapshot_target) | list } ) }}"
   loop: "{{ ansible_facts['mounts'] | selectattr('fstype', '==', 'btrfs') | map(attribute='device') | unique | list }}"
   loop_control:
     loop_var: device
