@@ -1,6 +1,6 @@
 ---
-- name: 'install btrshot.sh dependencies'
-  package:
+- name: 'Install btrshot.sh dependencies'
+  ansible.builtin.package:
     name: "{{ item }}"
     state: present
   loop:
@@ -8,29 +8,29 @@
     - findutils
     - sed
 
-- name: 'install btrshot.sh'
-  copy:
-    src: 'btrshot.sh'
+- name: 'Install btrshot.sh'
+  ansible.builtin.copy:
+    src: btrshot.sh
     dest: '/usr/local/sbin/'
     owner: root
     group: root
     mode: 0755
 
-- name: 'use configured list of subvolumes to snapshot'
-  set_fact:
+- name: 'Use configured list of subvolumes to snapshot'
+  ansible.builtin.set_fact:
     _snapshot_subvolumes: "{{ btrshot_snapshot }}"
   when: "btrshot_snapshot is defined"
 
-- name: 'autodetect list of subvolumes to snapshot'
-  set_fact:
-    _snapshot_subvolumes: "{{ _snapshot_subvolumes | default({}) | combine( { device: ansible_facts['mounts'] | selectattr('device', '==', device) | map(attribute='options') | map('regex_search', '(?<=subvol=)[^,]*') | reject('==', btrshot_snapshot_target) | list } ) }}"
-  loop: "{{ ansible_facts['mounts'] | selectattr('fstype', '==', 'btrfs') | map(attribute='device') | unique | list }}"
+- name: 'Autodetect list of subvolumes to snapshot'
+  ansible.builtin.set_fact:
+    _snapshot_subvolumes: "{{ _snapshot_subvolumes | default({}) | ansible.builtin.combine({device: ansible_facts['mounts'] | selectattr('device', '==', device) | map(attribute='options') | map('ansible.builtin.regex_search', '(?<=subvol=)[^,]*') | reject('==', btrshot_snapshot_target) | list}) }}"
+  loop: "{{ ansible_facts['mounts'] | selectattr('fstype', '==', 'btrfs') | map(attribute='device') | ansible.builtin.unique | list }}"
   loop_control:
     loop_var: device
   when: "btrshot_snapshot is not defined"
 
-- name: 'configure automatic snapshots'
-  include_tasks: btrshot.yml
+- name: 'Configure automatic snapshots'
+  ansible.builtin.include_tasks: btrshot.yml
   loop: "{{ btrshot_snapshot_frequency.keys() | list }}"
   loop_control:
     loop_var: tag

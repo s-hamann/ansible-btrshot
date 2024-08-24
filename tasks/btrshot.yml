@@ -1,16 +1,16 @@
 ---
-- name: "set btrshot command for {{ tag }} snapshots"
-  set_fact:
-    _btrshot_cmd: "{% for device, subvolumes in _snapshot_subvolumes | dictsort %}[ -e {{ device | quote }} ] && for subvol in {{ subvolumes | reject('in', btrshot_no_snapshot[device] | default([])) | map('quote') | join(' ') }}; do btrshot.sh --read-only --quiet --device {{ device | quote }} -- \"${subvol}\" {{ btrshot_snapshot_target | quote }} {{ tag | regex_replace('%.*', '') | quote }} {{ btrshot_snapshot_keep[tag | regex_replace('%.*', '')] | mandatory | quote }}; done; {% endfor %}"
+- name: "Set btrshot command for {{ tag }} snapshots"
+  ansible.builtin.set_fact:
+    _btrshot_cmd: "{% for device, subvolumes in _snapshot_subvolumes | dictsort %}[ -e {{ device | ansible.builtin.quote }} ] && for subvol in {{ subvolumes | reject('in', btrshot_no_snapshot[device] | default([])) | map('ansible.builtin.quote') | join(' ') }}; do btrshot.sh --read-only --quiet --device {{ device | ansible.builtin.quote }} -- \"${subvol}\" {{ btrshot_snapshot_target | ansible.builtin.quote }} {{ tag | ansible.builtin.regex_replace('%.*', '') | ansible.builtin.quote }} {{ btrshot_snapshot_keep[tag | ansible.builtin.regex_replace('%.*', '')] | ansible.builtin.mandatory | ansible.builtin.quote }}; done; {% endfor %}"
 
-- name: 'create cronjob directory'
-  file:
+- name: 'Create cronjob directory'
+  ansible.builtin.file:
     path: "/etc/cron.{{ btrshot_snapshot_frequency[tag] }}"
     state: directory
   when: "btrshot_snapshot_frequency[tag] in ['hourly', 'daily', 'weekly', 'monthly']"
 
-- name: 'create cronjob'
-  copy:
+- name: 'Create cronjob'
+  ansible.builtin.copy:
     dest: "/etc/cron.{{ btrshot_snapshot_frequency[tag] }}/btrshot_{{ tag | replace('/', '_') }}"
     content: "#!/bin/sh\n# {{ tag }} btrfs snapshots\nPATH=\"$PATH:/usr/local/sbin\"\n{{ _btrshot_cmd }}\n"
     owner: root
@@ -18,28 +18,28 @@
     mode: 0755
   when: "btrshot_snapshot_frequency[tag] in ['hourly', 'daily', 'weekly', 'monthly']"
 
-- name: 'create cronjob directory'
-  file:
+- name: 'Create cronjob directory'
+  ansible.builtin.file:
     path: '/etc/cron.d'
     state: directory
   when: "ansible_facts['os_family'] != 'Alpine' and btrshot_snapshot_frequency[tag] not in ['hourly', 'daily', 'weekly', 'monthly']"
 
-- name: 'configure cronjob environment'
-  cron:
+- name: 'Configure cronjob environment'
+  ansible.builtin.cron:
     env: true
     name: PATH
     value: '/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/sbin'
     user: root
-    cron_file: "{{ (ansible_facts['os_family'] != 'Alpine') | ternary('btrshot', omit) }}"
+    cron_file: "{{ (ansible_facts['os_family'] != 'Alpine') | ansible.builtin.ternary('btrshot', omit) }}"
     state: present
   when: "btrshot_snapshot_frequency[tag] not in ['hourly', 'daily', 'weekly', 'monthly']"
 
-- name: 'create cronjob'
-  cron:
+- name: 'Create cronjob'
+  ansible.builtin.cron:
     name: "{{ tag }} btrfs snapshots"
     job: "{{ _btrshot_cmd }}"
     user: root
-    cron_file: "{{ (ansible_facts['os_family'] != 'Alpine') | ternary('btrshot', omit) }}"
+    cron_file: "{{ (ansible_facts['os_family'] != 'Alpine') | ansible.builtin.ternary('btrshot', omit) }}"
     state: present
     minute: "{{ btrshot_snapshot_frequency[tag].split()[0] }}"
     hour: "{{ btrshot_snapshot_frequency[tag].split()[1] }}"

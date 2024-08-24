@@ -1,26 +1,27 @@
+---
 galaxy_info:
-  author: Sebastian Hamann
-  description: Configure automatic periodic snapshots of btrfs filesystems
+  author: 'Sebastian Hamann'
+  description: 'Configure automatic periodic snapshots of btrfs filesystems'
   license: MIT
 
-  min_ansible_version: 2.5
+  min_ansible_version: '2.10'
 
   platforms:
     - name: Gentoo
       versions:
-        - any
+        - all
     - name: Alpine
       versions:
-        - any
+        - all
     - name: Debian
       versions:
         - buster
     - name: GenericLinux
       versions:
-        - any
+        - all
     - name: GenericUNIX
       versions:
-        - any
+        - all
 
   galaxy_tags:
     - btrfs
