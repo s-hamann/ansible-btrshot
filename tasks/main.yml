@@ -5,6 +5,7 @@
     state: present
   loop:
     - bash
+    - btrfs-progs
     - findutils
     - sed
 
